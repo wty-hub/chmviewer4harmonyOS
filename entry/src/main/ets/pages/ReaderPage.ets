@@ -335,10 +335,13 @@ struct ReaderPage {
                   
                   // 层级指示器 / 展开按钮
                   if (item.hasChildren) {
-                    Text(item.isExpanded ? "▼ " : "▶ ")
-                      .fontSize(14)
-                      .fontColor(Color.Gray)
-                      .width(20)
+                    // 使用不易被渲染为Emoji的字符，并强制背景透明
+                    Text(item.isExpanded ? "▾" : "▸")
+                      .fontSize(26)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Color.Black)
+                      .backgroundColor(Color.Transparent)
+                      .width(40)
                       .textAlign(TextAlign.Center)
                       .onClick((event: ClickEvent) => {
                         this.toggleExpanded(item);
@@ -347,7 +350,7 @@ struct ReaderPage {
                     Text("• ")
                       .fontSize(14)
                       .fontColor(Color.Gray)
-                      .width(20)
+                      .width(40)
                       .textAlign(TextAlign.Center)
                   }
                   
