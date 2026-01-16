@@ -1,6 +1,6 @@
 {
   "app": {
-    "bundleName": "com.example.chmviewer",
+    "bundleName": "com.wty.chmviewer",
     "vendor": "example",
     "versionCode": 1000000,
     "versionName": "1.0.0",

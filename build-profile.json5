@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\daerh\\.ohos\\config\\default_CHMviewer_8r4Be3RMgPqFGa0i9mb1rhaSYN9kTfwNXhY28V3Ho5k=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BEC490A65ED3194CDDCA06932F02CCD4C467788030977D3EF0732E4BA762D604E20F993FC4FE685",
+          "profile": "C:\\Users\\daerh\\.ohos\\config\\default_CHMviewer_8r4Be3RMgPqFGa0i9mb1rhaSYN9kTfwNXhY28V3Ho5k=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\daerh\\.ohos\\config\\default_CHMviewer_8r4Be3RMgPqFGa0i9mb1rhaSYN9kTfwNXhY28V3Ho5k=.p12",
+          "storePassword": "0000001B08ACC8A5D2CA9FAB74B1D57A11278CFBDAE6B36A160623D6C62A535B66351CB83D20F0053735D9"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",

@@ -61,6 +61,14 @@
               {
                 "scheme": "content",
                 "type": "application/chm"
+              },
+              {
+                "scheme": "file",
+                "pathRegex": ".*\\.chm$"
+              },
+              {
+                "scheme": "file",
+                "pathRegex": ".*\\.CHM$"
               }
             ]          }
         ]
