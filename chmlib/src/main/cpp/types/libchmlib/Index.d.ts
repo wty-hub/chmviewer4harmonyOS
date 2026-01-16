@@ -19,3 +19,11 @@ export const getFileList: (chmPath: string) => string[];
  * @returns 首页路径 (例如 "/index.html")，如果未找到则返回空字符串
  */
 export const getHomeFile: (chmPath: string) => string;
+
+/**
+ * 获取 CHM 文件的目录文件 (TOC)
+ * @param chmPath CHM 文件路径
+ * @returns 目录文件路径 (例如 "/toc.hhc")，如果未找到则返回空字符串
+ */
+export const getTocFile: (chmPath: string) => string;
+

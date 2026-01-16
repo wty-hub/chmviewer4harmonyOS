@@ -110,6 +110,16 @@ extern "C" int EnumeratorCallback(struct chmFile *h, struct chmUnitInfo *ui, voi
     if (ui->path[0] != '\0') {
          std::vector<std::string>* paths = (std::vector<std::string>*)context;
          paths->push_back(std::string(ui->path));
+         
+         // Log the first few files or if it looks like a TOC to debug
+         std::string p(ui->path);
+         // OH_LOG_INFO is not available directly, need header. But we have LOG_TAG defined.
+         // Let's print every file to log for now? Might be too much.
+         // Just print .hhc files
+         if (p.length() > 4 && 
+             (p.substr(p.length() - 4) == ".hhc" || p.substr(p.length() - 4) == ".HHC")) {
+             OH_LOG_INFO(LOG_APP, "Native found HHC: %{public}s", p.c_str());
+         }
     }
     return CHM_ENUMERATOR_CONTINUE;
 }
@@ -131,8 +141,11 @@ static napi_value GetFileList(napi_env env, napi_callback_info info) {
     }
     
     std::string chmPath = NapiValueToString(env, args[0]);
+    OH_LOG_INFO(LOG_APP, "GetFileList called for path: %{public}s", chmPath.c_str());
+
     struct chmFile *h = chm_open(chmPath.c_str());
     if (h == nullptr) {
+        OH_LOG_ERROR(LOG_APP, "GetFileList failed to open CHM file: %{public}s", chmPath.c_str());
         // Return empty array if failed
         napi_value result;
         napi_create_array(env, &result);
@@ -141,9 +154,13 @@ static napi_value GetFileList(napi_env env, napi_callback_info info) {
     
     std::vector<std::string> filePaths;
     
-    // Enumerate all files (CHM_ENUMERATE_FILES)
-    chm_enumerate(h, CHM_ENUMERATE_FILES, EnumeratorCallback, &filePaths);
+    // Enumerate all files (CHM_ENUMERATE_ALL to ensure we match Normal/Meta/Special types)
+    if (!chm_enumerate(h, CHM_ENUMERATE_ALL, EnumeratorCallback, &filePaths)) {
+         OH_LOG_ERROR(LOG_APP, "chm_enumerate failed");
+    }
     
+    OH_LOG_INFO(LOG_APP, "GetFileList found %{public}zu files", filePaths.size());
+
     chm_close(h);
     
     // Convert vector to JS Array
@@ -235,6 +252,73 @@ static napi_value GetHomeFile(napi_env env, napi_callback_info info) {
 }
 
 // -------------------------------------------------------------------------
+// 核心接口：从 #SYSTEM 文件获取 Contents File (TOC)
+// 参数 1 (String): CHM 文件在沙箱中的绝对路径
+// 返回值: String (TOC File, e.g. "/toc.hhc") 或者是空字符串
+// -------------------------------------------------------------------------
+static napi_value GetTocFile(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1] = {nullptr};
+
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc < 1) {
+        napi_throw_error(env, nullptr, "Argument missing: path");
+        return nullptr;
+    }
+
+    std::string chmPath = NapiValueToString(env, args[0]);
+    OH_LOG_INFO(LOG_APP, "GetTocFile called for path: %{public}s", chmPath.c_str());
+
+    struct chmFile *h = chm_open(chmPath.c_str());
+        
+    napi_value result;
+    napi_create_string_utf8(env, "", 0, &result); // Default return empty
+    
+    if (h == nullptr) {
+        OH_LOG_ERROR(LOG_APP, "GetTocFile failed to open CHM file: %{public}s", chmPath.c_str());
+        return result;
+    }
+
+    struct chmUnitInfo ui;
+    if (chm_resolve_object(h, "/#SYSTEM", &ui) == CHM_RESOLVE_SUCCESS) {
+        unsigned char *buf = (unsigned char *)malloc(ui.length);
+        if (buf) {
+            if (chm_retrieve_object(h, &ui, buf, 0, ui.length) > 0) {
+               // Parse #SYSTEM
+               if (ui.length >= 4) {
+                  // Skip version (4 bytes)
+                  size_t offset = 4;
+                  while (offset + 4 <= ui.length) {
+                       uint16_t code = read_uint16(buf + offset);
+                       uint16_t len = read_uint16(buf + offset + 2);
+                       offset += 4;
+                       
+                       if (offset + len > ui.length) break;
+                       
+                       // Code 0 is Contents File (TOC)
+                       if (code == 0) {
+                           std::string topic((char*)(buf + offset), len > 0 ? len - 1 : 0);
+                           if (!topic.empty() && topic[0] != '/') {
+                               topic = "/" + topic;
+                           }
+                           napi_create_string_utf8(env, topic.c_str(), NAPI_AUTO_LENGTH, &result);
+                           break;
+                       }
+                       
+                       offset += len;
+                  }
+               }
+            }
+            free(buf);
+        }
+    }
+    
+    chm_close(h);
+    return result;
+}
+
+// -------------------------------------------------------------------------
 // 模块注册模板代码
 // -------------------------------------------------------------------------
 EXTERN_C_START
@@ -243,9 +327,9 @@ static napi_value Init(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
         { "readContent", nullptr, ReadChmFileContent, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "getFileList", nullptr, GetFileList, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "getHomeFile", nullptr, GetHomeFile, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "getHomeFile", nullptr, GetHomeFile, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "getTocFile", nullptr, GetTocFile, nullptr, nullptr, nullptr, napi_default, nullptr },
     };
-    
     // 挂载方法到 exports 对象上
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

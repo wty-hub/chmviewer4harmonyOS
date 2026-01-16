@@ -46,14 +46,22 @@
                 "scheme": "content",
                 "type": "application/x-chm"
               },
-               {
-                 "scheme": "file",
-                 "type": "application/vnd.ms-htmlhelp"
-               },
-               {
-                 "scheme": "content",
-                 "type": "application/vnd.ms-htmlhelp"
-               }
+              {
+                "scheme": "file",
+                "type": "application/vnd.ms-htmlhelp"
+              },
+              {
+                "scheme": "content",
+                "type": "application/vnd.ms-htmlhelp"
+              },
+              {
+                "scheme": "file",
+                "type": "application/chm"
+              },
+              {
+                "scheme": "content",
+                "type": "application/chm"
+              }
             ]          }
         ]
       }
