@@ -11,7 +11,7 @@ struct AboutPage {
     Column() {
       // Header
       Row() {
-         Button("Back")
+         Button("返回")
            .onClick(() => router.back())
            .margin({ left: 15, top: 15 })
       }.width('100%').justifyContent(FlexAlign.Start)

@@ -15,13 +15,20 @@ interface TocItem {
   hasChildren: boolean;
 }
 
+interface TocGroupItem {
+  header: TocItem;
+  children: TocItem[];
+}
+
 @Entry
 @Component
 struct ReaderPage {
   @State chmPath: string = '';
   @State currentPath: string = '/index.html'; // Default entry
   @State isTocVisible: boolean = false;
-  @State tocList: TocItem[] = []; // visible list
+  @State tocList: TocItem[] = []; // visible list (kept for compatibility check)
+  @State tocGroups: TocGroupItem[] = []; // grouped list for sticky headers
+
   private allTocItems: TocItem[] = []; // full list data
   controller: web_webview.WebviewController = new web_webview.WebviewController();
   isControllerReady: boolean = false;
@@ -282,6 +289,8 @@ struct ReaderPage {
   
   refreshVisibleToc() {
     const result: TocItem[] = [];
+    const groups: TocGroupItem[] = [];
+    let currentGroup: TocGroupItem | null = null;
     let hideLevel = -1;
     
     for (const item of this.allTocItems) {
@@ -294,6 +303,22 @@ struct ReaderPage {
       }
       
       result.push(item);
+
+      // Grouping for sticky headers
+      // If it's a root item (Level 0), it starts a new sticky group
+      if (item.level === 0) {
+        currentGroup = { header: item, children: [] };
+        groups.push(currentGroup);
+      } else {
+        // Child items go into current group
+        if (currentGroup) {
+           currentGroup.children.push(item);
+        } else {
+           // Fallback for non-standard start (e.g. if we start at level 1)
+           currentGroup = { header: item, children: [] };
+           groups.push(currentGroup);
+        }
+      }
       
       // If this item is collapsed and has children, start hiding deeper levels
       if (item.hasChildren && !item.isExpanded) {
@@ -301,6 +326,7 @@ struct ReaderPage {
       }
     }
     this.tocList = result;
+    this.tocGroups = groups;
   }
   
   toggleExpanded(item: TocItem) {
@@ -309,6 +335,68 @@ struct ReaderPage {
       target.isExpanded = !target.isExpanded;
       this.refreshVisibleToc();
     }
+  }
+
+  @Builder itemContent(item: TocItem) {
+    Row() {
+      // 根据层级添加缩进
+      if (item.level > 0) {
+        Row() {
+          // 缩进占位
+          Text("").width((item.level - 1) * 20)
+          
+          // Indentation spacer
+        }
+        .width(20)
+        .height(32) 
+      }
+      
+      // 层级指示器 / 展开按钮
+      if (item.hasChildren) {
+        Button() {
+          Text(item.isExpanded ? "▾" : "▸")
+            .fontSize(22)
+            .fontColor('#555555')
+            .fontWeight(FontWeight.Bold)
+        }
+        .type(ButtonType.Normal)
+        .width(32)
+        .height(32)
+        .borderRadius(6)
+        .backgroundColor('#f0f0f0')
+        .margin({ right: 4 })
+        .onClick(() => {
+          this.toggleExpanded(item);
+        })
+      } else {
+        Text("•")
+          .fontSize(22)
+          .fontColor('#DDDDDD')
+          .width(32)
+          .height(32)
+          .textAlign(TextAlign.Center)
+          .margin({ right: 4 })
+      }
+      
+      // 项目名称
+      Text(item.name)
+        .fontSize(item.level === 0 ? 16 : 15)
+        .fontColor(item.level === 0 ? Color.Black : '#333333')
+        .fontWeight(item.level === 0 ? FontWeight.Medium : FontWeight.Normal)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .onClick(() => {
+          // 只有有路径的项目才能点击
+          if (item.path && item.path.length > 0) {
+            this.loadPage(item.path);
+            this.isTocVisible = false; // Close sidebar on mobile/overlay mode
+          }
+        })
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .backgroundColor(Color.White)
   }
 
   build() {
@@ -326,55 +414,17 @@ struct ReaderPage {
             .margin(20)
         } else {
           List() {
-            ForEach(this.tocList, (item: TocItem) => {
-              ListItem() {
-                Row() {
-                  // 根据层级添加缩进
-                  Text("")
-                    .width(item.level * 20)
-                  
-                  // 层级指示器 / 展开按钮
-                  if (item.hasChildren) {
-                    // 使用不易被渲染为Emoji的字符，并强制背景透明
-                    Text(item.isExpanded ? "▾" : "▸")
-                      .fontSize(26)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Color.Black)
-                      .backgroundColor(Color.Transparent)
-                      .width(40)
-                      .textAlign(TextAlign.Center)
-                      .onClick((event: ClickEvent) => {
-                        this.toggleExpanded(item);
-                      })
-                  } else {
-                    Text("• ")
-                      .fontSize(14)
-                      .fontColor(Color.Gray)
-                      .width(40)
-                      .textAlign(TextAlign.Center)
-                  }
-                  
-                  // 项目名称
-                  Text(item.name)
-                    .fontSize(item.level === 0 ? 16 : 15)
-                    .fontColor(item.level === 0 ? Color.Black : '#333333')
-                    .fontWeight(item.level === 0 ? FontWeight.Medium : FontWeight.Normal)
-                    .layoutWeight(1)
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }
-                .width('100%')
-                .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-                .onClick(() => {
-                  // 只有有路径的项目才能点击
-                  if (item.path && item.path.length > 0) {
-                    this.loadPage(item.path);
-                    this.isTocVisible = false; // Close sidebar on mobile/overlay mode
+            ForEach(this.tocGroups, (group: TocGroupItem) => {
+              ListItemGroup({ header: this.itemContent(group.header) }) {
+                ForEach(group.children, (child: TocItem) => {
+                  ListItem() {
+                    this.itemContent(child)
                   }
                 })
               }
             })
           }
+          .sticky(StickyStyle.Header)
           .layoutWeight(1)
           .width('100%')
           .divider({ strokeWidth: 1, color: '#f0f0f0' })
